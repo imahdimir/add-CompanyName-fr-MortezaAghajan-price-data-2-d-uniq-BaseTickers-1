@@ -7,13 +7,13 @@
 ##
 
 import re
-import pandas as pd
 
+import pandas as pd
 from githubdata import GithubData
 from mirutil import funcs as mf
 
 
-btic_repo_url = 'https://github.com/imahdimir/d-Unique-BaseTickers-TSETMC'
+btic_repo_url = 'https://github.com/imahdimir/d-uniq-BaseTickers'
 
 btick = 'BaseTicker'
 ipojd = 'IPOJDate'
@@ -21,17 +21,14 @@ cname = 'CompanyName'
 naam = 'نام شركت'
 date = 'date'
 
-def take_until_ticker_in_pranthesis(istr , tick) :
-  _st = mf.norm_fa_str(istr)
-
-  ptr = r'(.+\()\s?' + str(tick) + r'\s?\).+'
-  _st1 = re.sub(ptr , r'\1' , _st)
-
-  ou = istr[: len(_st1) + 1].strip()
+def take_until_ticker_in_pranthesis(istr) :
+  ptr = r'^(.+\()\s?.+\)\s?-.+'
+  st = re.sub(ptr , r'\1' , istr)
 
   ptr = r'\([^\(]*$'
+  ou = re.sub(ptr , '' , st)
 
-  return re.sub(ptr , '' , ou).strip()
+  return ou.strip()
 
 def main() :
 
@@ -71,9 +68,9 @@ def main() :
   bdf = bdf[[btick , 'title']]
   ##
   msk = bdf['title'].notna()
-  bdf.loc[msk , cname] = bdf.loc[
-    msk].apply(lambda x : take_until_ticker_in_pranthesis(x['title'] ,
-                                                          x[btick]) , axis = 1)
+
+  fu = take_until_ticker_in_pranthesis
+  bdf.loc[msk , cname] = bdf.loc[msk , 'title'].apply(fu)
   ##
   bdf = bdf[[btick , cname]]
   ##
@@ -87,4 +84,6 @@ def main() :
   ##
   btic_repo.rmdir()
 
-##
+  ##
+  msk = bdf[cname].isna()
+  df1 = bdf[msk]  ##
