@@ -7,6 +7,7 @@ import re
 
 import pandas as pd
 from githubdata import GithubData
+from mirutil.df_utils import save_as_prq_wo_index as sprq
 
 
 class GDUrl :
@@ -14,17 +15,19 @@ class GDUrl :
         gj = json.load(fi)
 
     cur = gj['cur']
+    src = gj['src']
     trg = gj['trg']
 
 gu = GDUrl()
 
-btic_repo_url = 'https://github.com/imahdimir/d-uniq-BaseTickers'
+class ColName:
+    ftic = 'FirmTicker'
+    cname = 'CompanyName'
+    name = 'name'
+    titl = 'title'
+    naam = 'نام شركت'
 
-btick = 'BaseTicker'
-ipojd = 'IPOJDate'
-cname = 'CompanyName'
-naam = 'نام شركت'
-date = 'date'
+c = ColName()
 
 def take_until_ticker_in_pranthesis(istr) :
     ptr = r'^(.+\()\s?.+\)\s?-.+'
@@ -39,57 +42,66 @@ def main() :
     pass
 
     ##
-    fn = 'Cleaned_Stock_Prices_14010122.parquet'
-    prdf = pd.read_parquet(fn)
-    ##
-    if date in prdf.columns :
-        prdf = prdf.sort_values('date' , ascending = False)
-
-    prdfv = prdf.head()
+    fp = 'data.prq'
+    df = pd.read_parquet(fp)
     ## titles differ for the same ticker if only the market has changed which is not important in this point
-    prdf = prdf[['name' , 'title']]
+    df = df[[c.name , c.titl]]
     ##
-    prdf = prdf.drop_duplicates()
+    df = df.drop_duplicates()
+    ##
+    df[c.name] = df[c.name].str.strip()
+    ##
+    df = df.drop_duplicates(subset = [c.name])
     ##
 
-    btic_repo = GithubData(btic_repo_url)
-    btic_repo.clone_overwrite_last_version()
+    gd_src = GithubData(gu.src)
+    gd_src.overwriting_clone()
     ##
-    bdfpn = btic_repo.data_fps[0]
-    bdf = pd.read_parquet(bdfpn)
+    ds = gd_src.read_data()
     ##
-    bdf = bdf.reset_index()
-    bdf = bdf[[btick]]
-    ##
-    prdf['name'] = prdf['name'].apply(lambda x : mf.norm_fa_str(x))
-    ##
-    prdf = prdf.drop_duplicates(subset = ['name'])
-    ##
-    bdf = bdf.merge(prdf , left_on = btick , right_on = 'name' , how = 'left')
-    ##
-    bdf = bdf.sort_values(btick)
-    ##
-    bdf = bdf[[btick , 'title']]
-    ##
-    msk = bdf['title'].notna()
 
+    da = pd.merge(ds, df , left_on = c.ftic , right_on = c.name , how = 'left')
+    ##
+    da = da.dropna()
+    da = da[[c.ftic , c.titl]]
+    ##
     fu = take_until_ticker_in_pranthesis
-    bdf.loc[msk , cname] = bdf.loc[msk , 'title'].apply(fu)
+    da[c.cname] = da[c.titl].apply(fu)
     ##
-    bdf = bdf[[btick , cname]]
+
+    da = da[[c.cname , c.ftic]]
     ##
-    bdf = bdf.set_index(btick)
+    da[c.cname] = da[c.cname].str.strip()
     ##
-    bdf.to_parquet(bdfpn)
+
+    da = da.astype('string')
     ##
-    commit_msg = 'added company name from Morteza Aghajan price data crawled from TSETMC.com'
-    btic_repo.commit_and_push_to_github_data_target(commit_msg)
+
+    gd_trg = GithubData(gu.trg)
+    gd_trg.overwriting_clone()
+    ##
+
+    fp = gd_trg.local_path / 'data.prq'
+    sprq(da , fp)
+    ##
+
+    msg = 'init by: '
+    msg += gu.cur
+    ##
+
+    gd_trg.commit_and_push(msg)
 
     ##
-    btic_repo.rmdir()
+
+    gd_src.rmdir()
+    gd_trg.rmdir()
 
     ##
-    msk = bdf[cname].isna()
-    df1 = bdf[msk]
 
-    ##
+##
+if __name__ == '__main__' :
+    main()
+
+##
+
+##
